@@ -25,7 +25,7 @@ Fit gamma hurdle models to stomach content (non-negative, zeroes, continuous) da
 
 ```{r lib, message=FALSE}
 # Load libraries, install if needed
-library(tidyverse); theme_set(theme_light(base_size = 10))
+library(tidyverse); theme_set(theme_classic(base_size = 10))
 library(readxl)
 library(tidylog)
 library(RCurl)
@@ -35,10 +35,6 @@ library(patchwork)
 library(brms)
 library(bayesplot)
 library(tidybayes)
-
-library(glmmTMB)
-library(DHARMa)
-library(equatiomatic)
 
 # To load entire cache in interactive r session, do: qwraps2::lazyload_cache_dir(path = "R/analysis/cod_feeding_historical_cache/html")
 
@@ -154,8 +150,6 @@ p4 <- ggplot(filter(d, quarter == 4), aes(year, FR_tot, color = time_period, fil
 d <- d %>% filter(quarter == 1)
 ```
 
-# Start with fitting a simple gamma model
-
 ```{r simpler gamma models, cache=TRUE}
 # Read about gamma hurdle models
 # https://stats.stackexchange.com/questions/470464/interpreting-residual-plots-for-zero-inflated-linear-mixed-model?rq=1
@@ -171,178 +165,25 @@ d <- d %>% filter(quarter == 1)
 # https://stats.stackexchange.com/questions/281159/minimum-number-of-repeated-measures-and-levels-per-nested-random-effect
 # OK to have time period both as a fixed and in the random part?
 # https://stats.stackexchange.com/questions/79360/mixed-effects-model-with-nesting
-
-m00 <- brm(FR_tot ~ -1 + pred_weight_g + depth2_sc + time_period,
-           data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
-           chains = 2, iter = 2000, cores = 2, inits = "0",
-           control = list(adapt_delta = 0.9))
-
-summary(m00)
-plot(m00)
 ```
 
-Inspect model m00
-
-```{r inspect m00}
-# PP check
-# p1 <- pp_check(m00) +
-#   theme_plot() +
-#   theme(legend.position = c(0.9, 0.9)) + 
-#   coord_cartesian(xlim = c(0, 0.15)) + 
-#   scale_color_brewer(palette = "Dark2", name = "") + 
-#   NULL
-# 
-# color_scheme_set("gray")
-# yrep_hu_gamma <- posterior_predict(m00, draws = 500)
-# y <- d$FR_tot
-# 
-# p2 <- ppc_stat(y, yrep_hu_gamma, stat = "median") + theme_plot()
-# p3 <- ppc_stat(y, yrep_hu_gamma, stat = "mean") + theme_plot()
-# 
-# prop_zero <- function(x) mean(x == 0)
-# prop_zero(y)
-# 
-# p4 <- ppc_stat(y, yrep_hu_gamma, stat = "prop_zero", binwidth = 0.005)  + theme_plot()
-# 
-# p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
-# 
-# # Chain convergence
-# posterior <- as.array(m00)
-# dimnames(posterior)
-# pal_diag <- rev(brewer.pal(n = 3, name = "Dark2"))
-# 
-# # Chain convergence
-# p5 <- mcmc_trace(posterior, pars = c("b_time_period1963M1978", "b_time_period1986M1990",
-#                                      "b_time_period2006M2020", "shape"),
-#                  facet_args = list(ncol = 2, strip.position = "left")) + 
-#   theme(text = element_text(size = 12), strip.text = element_text(size = 3),
-#         legend.position = "top") + 
-#   scale_color_manual(values = alpha(pal_diag, alpha = 0.8)) +
-#   theme_plot()
-# 
-# # Residuals vs fitted
-# p6 <- d %>%
-#   add_residual_draws(m00) %>%
-#   ggplot(aes(x = .row, y = .residual)) +
-#   stat_pointinterval(alpha = 0.5, size = 0.7) + 
-#   theme_plot()
-# 
-# # Quantile dot-plot
-# p7 <- m00 %>%
-#   gather_draws(b_time_period1963M1978, b_time_period1986M1990, b_time_period2006M2020) %>%
-#   mutate(time_period = "1963-1978",
-#          time_period = ifelse(.variable == "b_time_period1986M1990", "1986-1990", time_period),
-#          time_period = ifelse(.variable == "b_time_period2006M2020", "2006-2020", time_period)) %>% 
-#   ggplot(aes(x = .value, y = time_period, color = time_period, fill = time_period)) +
-#   stat_halfeye(alpha = 0.5, color = "grey30", size = 12) + 
-#   labs(y = "") +
-#   guides(color = FALSE, fill = FALSE) +
-#   scale_fill_brewer(palette = "Dark2") +
-#   theme_plot() +
-#   NULL
-# 
-# p5 / (p6 | p7)
-```
-
-## Add random `year` effect to each time_period
-
-```{r add year random effect, cache=TRUE}
-m01 <- brm(FR_tot ~ 0 + pred_weight_g + depth2_sc + time_period + (0 + time_period|year),
-           data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
-           chains = 2, iter = 2000, cores = 2, inits = "0",
-           control = list(adapt_delta = 0.99, max_treedepth = 15))
-
-summary(m01)
-plot(m01)
-```
-
-Inspect model m01
-
-```{r inspect m01}
-# PP check
-# p1 <- pp_check(m01) +
-#   theme_plot() +
-#   theme(legend.position = c(0.9, 0.9)) + 
-#   coord_cartesian(xlim = c(0, 0.15)) + 
-#   scale_color_brewer(palette = "Dark2", name = "") + 
-#   NULL
-# 
-# color_scheme_set("gray")
-# yrep_hu_gamma <- posterior_predict(m01, draws = 500)
-# y <- d$FR_tot
-# 
-# p2 <- ppc_stat(y, yrep_hu_gamma, stat = "median") + theme_plot()
-# p3 <- ppc_stat(y, yrep_hu_gamma, stat = "mean") + theme_plot()
-# 
-# prop_zero <- function(x) mean(x == 0)
-# prop_zero(y)
-# 
-# p4 <- ppc_stat(y, yrep_hu_gamma, stat = "prop_zero", binwidth = 0.005)  + theme_plot()
-# 
-# p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
-# 
-# # Chain convergence
-# posterior <- as.array(m01)
-# dimnames(posterior)
-# pal_diag <- rev(brewer.pal(n = 3, name = "Dark2"))
-# 
-# # Chain convergence
-# p5 <- mcmc_trace(posterior, pars = c("b_time_period1963M1978", "b_time_period1986M1990",
-#                                      "b_time_period2006M2020", "shape"),
-#                  facet_args = list(ncol = 2, strip.position = "left")) + 
-#   theme(text = element_text(size = 12), strip.text = element_text(size = 3), 
-#         legend.position = "top") + 
-#   scale_color_manual(values = alpha(pal_diag, alpha = 0.8)) +
-#   theme_plot()
-# 
-# # Residuals vs fitted
-# p6 <- d %>%
-#   add_residual_draws(m01) %>%
-#   ggplot(aes(x = .row, y = .residual)) +
-#   stat_pointinterval(alpha = 0.5, size = 0.7) + 
-#   theme_plot()
-# 
-# # Quantile dot-plot
-# get_variables(m01)
-# 
-# p7 <- m01 %>%
-#   gather_draws(b_time_period1963M1978, b_time_period1986M1990, b_time_period2006M2020) %>%
-#   mutate(time_period = "1963-1978",
-#          time_period = ifelse(.variable == "b_time_period1986M1990", "1986-1990", time_period),
-#          time_period = ifelse(.variable == "b_time_period2006M2020", "2006-2020", time_period)) %>% 
-#   ggplot(aes(x = .value, y = time_period, color = time_period, fill = time_period)) +
-#   stat_halfeye(alpha = 0.5, color = "grey30", size = 12) + 
-#   labs(y = "") +
-#   guides(color = FALSE, fill = FALSE) +
-#   scale_fill_brewer(palette = "Dark2") +
-#   theme_plot() +
-#   NULL
-# 
-# p5 / (p6 | p7)
-```
-
-## Add random `year` effect to each time_period and random `ices_rect` 
+## Fit gamma hurdle model to total prey weight with random `year` effect to each time_period and random `ices_rect` 
 
 ```{r random year and rectangle effects, cache=TRUE}
-m02 <- brm(FR_tot ~ 0 + pred_weight_g + depth2_sc + time_period + (0 + time_period|year) + (0 + time_period|ices_rect),
+m <- brm(FR_tot ~ 0 + pred_weight_g + depth2_sc + time_period + (0 + time_period|year) + (0 + time_period|ices_rect),
            data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
-           chains = 2, iter = 4000, cores = 4, inits = "0",
+           chains = 4, iter = 4000, cores = 4, inits = "0",
            control = list(adapt_delta = 0.99, max_treedepth = 15))
 
-test <- brm(FR_tot ~ 0 + pred_weight_g + depth2_sc + time_period + (0 + time_period|year) + (0 + time_period|ices_rect),
-           data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
-           chains = 1, iter = 1, cores = 1, inits = "0",
-           control = list(adapt_delta = 0.99, max_treedepth = 15))
-
-summary(m02)
-plot(m02)
+summary(m)
+plot(m)
 ```
 
-Inspect model m02
+Inspect model m
 
-```{r inspect m02}
+```{r inspect m}
 # PP check
-p1 <- pp_check(m02) +
+p1 <- pp_check(m) +
   theme_plot() +
   theme(legend.position = c(0.9, 0.9)) +
   coord_cartesian(xlim = c(0, 0.15)) +
@@ -350,7 +191,7 @@ p1 <- pp_check(m02) +
   NULL
 
 color_scheme_set("gray")
-yrep_hu_gamma <- posterior_predict(m02, draws = 500)
+yrep_hu_gamma <- posterior_predict(m, draws = 500)
 y <- d$FR_tot
 
 p2 <- ppc_stat(y, yrep_hu_gamma, stat = "median") + theme_plot()
@@ -364,9 +205,9 @@ p4 <- ppc_stat(y, yrep_hu_gamma, stat = "prop_zero", binwidth = 0.005)  + theme_
 p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
 
 # # Chain convergence
-posterior <- as.array(m02)
+posterior <- as.array(m)
 dimnames(posterior)
-pal_diag <- rev(brewer.pal(n = 3, name = "Dark2"))
+pal_diag <- rev(brewer.pal(n = 4, name = "Dark2"))
 
 # Chain convergence
 p5 <- mcmc_trace(posterior, pars = c("b_time_period1963M1978", "b_time_period1986M1990",
@@ -379,15 +220,15 @@ p5 <- mcmc_trace(posterior, pars = c("b_time_period1963M1978", "b_time_period198
 
 # Residuals vs fitted
 p6 <- d %>%
-  add_residual_draws(m02) %>%
+  add_residual_draws(m) %>%
   ggplot(aes(x = .row, y = .residual)) +
   stat_pointinterval(alpha = 0.5, size = 0.7) +
   theme_plot()
 
 # Quantile dot-plot
-get_variables(m02)
+get_variables(m)
 
-p7 <- m02 %>%
+p7 <- m %>%
   gather_draws(b_time_period1963M1978, b_time_period1986M1990, b_time_period2006M2020) %>%
   mutate(time_period = "1963-1978",
          time_period = ifelse(.variable == "b_time_period1986M1990", "1986-1990", time_period),
@@ -407,6 +248,199 @@ p5 / (p6 | p7)
 
 ggsave("figures/FR.png", width = 6.5, height = 6.5, dpi = 600)
 ```
+
+## Plot random year effects
+
+```{r plot random effects}
+m %>%
+  spread_draws(b_time_period1963M1978, b_time_period1986M1990, b_time_period2006M2020,
+               r_year[year,]) %>%
+  mutate(year_mean = ifelse(year < 1979,
+                            b_time_period1963M1978 - r_year,
+                            b_time_period1986M1990 - r_year),
+         year_mean = ifelse(year > 2005,
+                            b_time_period2006M2020 - r_year,
+                            year_mean)) %>%
+  mutate(time_period = ifelse(year < 1979, "1963-1978", "1986-1990"),
+         time_period = ifelse(year > 2005, "2006-2020", time_period)) %>% 
+  ggplot(aes(y = factor(year), x = year_mean, fill = time_period)) +
+  coord_cartesian(xlim = c(-7, -3)) +
+  scale_fill_brewer(palette = "Dark2") +
+  stat_halfeye(alpha = 0.5)
+```
+
+## Fit gamma hurdle model to total prey weight with random `year` effect to each time_period and random `ices_rect` 
+
+```{r random year and rectangle effects, cache=TRUE}
+m <- brm(FR_tot ~ 0 + pred_weight_g + depth2_sc + time_period + (0 + time_period|year) + (0 + time_period|ices_rect),
+           data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
+           chains = 4, iter = 4000, cores = 4, inits = "0",
+           control = list(adapt_delta = 0.99, max_treedepth = 15))
+
+summary(m)
+plot(m)
+```
+
+Inspect model m
+
+## Exit
+
+```{r}
+knitr::knit_exit()
+```
+
+## Fitting a simple gamma model
+
+```{r fit simple gamma model}
+m00 <- brm(FR_tot ~ -1 + pred_weight_g + depth2_sc + time_period,
+           data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
+           chains = 2, iter = 2000, cores = 2, inits = "0",
+           control = list(adapt_delta = 0.9))
+
+summary(m00)
+plot(m00)
+```
+
+Inspect model m00
+
+```{r inspect m00}
+# PP check
+p1 <- pp_check(m00) +
+  theme_plot() +
+  theme(legend.position = c(0.9, 0.9)) +
+  coord_cartesian(xlim = c(0, 0.15)) +
+  scale_color_brewer(palette = "Dark2", name = "") +
+  NULL
+
+color_scheme_set("gray")
+yrep_hu_gamma <- posterior_predict(m00, draws = 500)
+y <- d$FR_tot
+
+p2 <- ppc_stat(y, yrep_hu_gamma, stat = "median") + theme_plot()
+p3 <- ppc_stat(y, yrep_hu_gamma, stat = "mean") + theme_plot()
+
+prop_zero <- function(x) mean(x == 0)
+prop_zero(y)
+
+p4 <- ppc_stat(y, yrep_hu_gamma, stat = "prop_zero", binwidth = 0.005)  + theme_plot()
+
+p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+# Chain convergence
+posterior <- as.array(m00)
+dimnames(posterior)
+pal_diag <- rev(brewer.pal(n = 3, name = "Dark2"))
+
+# Chain convergence
+p5 <- mcmc_trace(posterior, pars = c("b_time_period1963M1978", "b_time_period1986M1990",
+                                     "b_time_period2006M2020", "shape"),
+                 facet_args = list(ncol = 2, strip.position = "left")) +
+  theme(text = element_text(size = 12), strip.text = element_text(size = 3),
+        legend.position = "top") +
+  scale_color_manual(values = alpha(pal_diag, alpha = 0.8)) +
+  theme_plot()
+
+# Residuals vs fitted
+p6 <- d %>%
+  add_residual_draws(m00) %>%
+  ggplot(aes(x = .row, y = .residual)) +
+  stat_pointinterval(alpha = 0.5, size = 0.7) +
+  theme_plot()
+
+# Quantile dot-plot
+p7 <- m00 %>%
+  gather_draws(b_time_period1963M1978, b_time_period1986M1990, b_time_period2006M2020) %>%
+  mutate(time_period = "1963-1978",
+         time_period = ifelse(.variable == "b_time_period1986M1990", "1986-1990", time_period),
+         time_period = ifelse(.variable == "b_time_period2006M2020", "2006-2020", time_period)) %>%
+  ggplot(aes(x = .value, y = time_period, color = time_period, fill = time_period)) +
+  stat_halfeye(alpha = 0.5, color = "grey30", size = 12) +
+  labs(y = "") +
+  guides(color = FALSE, fill = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_plot() +
+  NULL
+
+p5 / (p6 | p7)
+```
+
+## Add random `year` effect to each time_period
+
+```{r add year random effect, cache=TRUE}
+m01 <- brm(FR_tot ~ 0 + pred_weight_g + depth2_sc + time_period + (0 + time_period|year),
+           data = d, family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
+           chains = 2, iter = 2000, cores = 2, inits = "0",
+           control = list(adapt_delta = 0.99, max_treedepth = 15))
+
+summary(m01)
+plot(m01)
+```
+
+Inspect model m01
+
+```{r inspect m01}
+# PP check
+p1 <- pp_check(m01) +
+  theme_plot() +
+  theme(legend.position = c(0.9, 0.9)) +
+  coord_cartesian(xlim = c(0, 0.15)) +
+  scale_color_brewer(palette = "Dark2", name = "") +
+  NULL
+
+color_scheme_set("gray")
+yrep_hu_gamma <- posterior_predict(m01, draws = 500)
+y <- d$FR_tot
+
+p2 <- ppc_stat(y, yrep_hu_gamma, stat = "median") + theme_plot()
+p3 <- ppc_stat(y, yrep_hu_gamma, stat = "mean") + theme_plot()
+
+prop_zero <- function(x) mean(x == 0)
+prop_zero(y)
+
+p4 <- ppc_stat(y, yrep_hu_gamma, stat = "prop_zero", binwidth = 0.005)  + theme_plot()
+
+p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+# Chain convergence
+posterior <- as.array(m01)
+dimnames(posterior)
+pal_diag <- rev(brewer.pal(n = 3, name = "Dark2"))
+
+# Chain convergence
+p5 <- mcmc_trace(posterior, pars = c("b_time_period1963M1978", "b_time_period1986M1990",
+                                     "b_time_period2006M2020", "shape"),
+                 facet_args = list(ncol = 2, strip.position = "left")) +
+  theme(text = element_text(size = 12), strip.text = element_text(size = 3),
+        legend.position = "top") +
+  scale_color_manual(values = alpha(pal_diag, alpha = 0.8)) +
+  theme_plot()
+
+# Residuals vs fitted
+p6 <- d %>%
+  add_residual_draws(m01) %>%
+  ggplot(aes(x = .row, y = .residual)) +
+  stat_pointinterval(alpha = 0.5, size = 0.7) +
+  theme_plot()
+
+# Quantile dot-plot
+get_variables(m01)
+
+p7 <- m01 %>%
+  gather_draws(b_time_period1963M1978, b_time_period1986M1990, b_time_period2006M2020) %>%
+  mutate(time_period = "1963-1978",
+         time_period = ifelse(.variable == "b_time_period1986M1990", "1986-1990", time_period),
+         time_period = ifelse(.variable == "b_time_period2006M2020", "2006-2020", time_period)) %>%
+  ggplot(aes(x = .value, y = time_period, color = time_period, fill = time_period)) +
+  stat_halfeye(alpha = 0.5, color = "grey30", size = 12) +
+  labs(y = "") +
+  guides(color = FALSE, fill = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_plot() +
+  NULL
+
+p5 / (p6 | p7)
+```
+
 
 ## Extract this equation
 Doesn't work with any model type that supports gamma, so this is for the random effects only

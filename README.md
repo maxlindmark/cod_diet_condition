@@ -10,7 +10,7 @@ We use Spatiotemporal generalized linear mixed-effects models and a predictive-m
 ## How to replicate our analyses and navigate this repo
 
 `data`
-We use data collated in [Lindmark et al, 20XX](https://github.com/maxlindmark/cod_condition)
+We use data collated in [Lindmark et al, 20XX](https://github.com/maxlindmark/cod_condition) and [Lindmark et al, 20XX](https://github.com/maxlindmark/cod_interactions)
 
 `R`
 Contains code for analysis and data processing
